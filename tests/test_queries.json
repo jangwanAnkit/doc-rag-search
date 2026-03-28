@@ -1,0 +1,26 @@
+[
+  {
+    "query": "breach of contract damages",
+    "expected_sources": ["smith_v_jones.pdf"],
+    "expected_keywords": ["breach", "contract", "damages"]
+  },
+  {
+    "query": "employment termination wrongful dismissal",
+    "expected_sources": ["doe_v_acme.pdf"],
+    "expected_keywords": ["employment", "termination", "dismissal"]
+  },
+  {
+    "query": "what did Justice Smith decide?",
+    "expected_sources": ["smith_v_jones.pdf"],
+    "expected_keywords": ["Justice Smith", "held"]
+  },
+  {
+    "query": "personal injury motor vehicle accident",
+    "expected_sources": ["brown_v_green.pdf"],
+    "expected_keywords": ["personal injury", "motor vehicle"]
+  },
+  {
+    "query": "court awarded damages",
+    "expected_keywords": ["damages", "court", "awarded"]
+  }
+]

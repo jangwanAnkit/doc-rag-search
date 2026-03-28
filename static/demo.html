@@ -1,0 +1,2191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Legal Casebase Search</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #000;
+            --fg: #fff;
+            --muted: #888;
+            --border: #333;
+            --accent: #0ff;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            background: var(--bg);
+            color: var(--fg);
+            font-variant-numeric: tabular-nums;
+            min-height: 100vh;
+        }
+
+        nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.5rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        nav .brand {
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: 0.05em;
+        }
+
+        nav .brand span {
+            color: var(--accent);
+        }
+
+        nav .tabs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 0.4rem 1rem;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .tab-btn:hover {
+            border-color: var(--accent);
+            color: var(--fg);
+        }
+
+        .tab-btn.active {
+            background: var(--accent);
+            color: var(--bg);
+            border-color: var(--accent);
+        }
+
+        nav .status {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        nav .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        nav .status-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--muted);
+        }
+
+        nav .status-dot.connected {
+            background: var(--accent);
+        }
+
+        nav .status-dot.error {
+            background: #f00;
+        }
+
+        .app-layout {
+            display: grid;
+            grid-template-columns: auto 1fr auto;
+            height: calc(100vh - 52px);
+        }
+
+        .filters-panel.collapsed {
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+            border-right: none;
+        }
+
+        .chat-panel.collapsed {
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+            border-left: none;
+        }
+
+        .filters-panel {
+            width: 250px;
+            border-right: 1px solid var(--border);
+            padding: 1rem;
+            overflow-y: auto;
+            background: var(--bg);
+        }
+
+        .results-panel {
+            padding: 1rem;
+            overflow-y: auto;
+            min-width: 0;
+        }
+
+        .chat-panel {
+            width: 350px;
+            border-left: 1px solid var(--border);
+            padding: 1rem;
+            display: none;
+            overflow-y: auto;
+            background: var(--bg);
+        }
+
+        .chat-panel.visible {
+            display: block;
+        }
+
+        .sidebar-toggle {
+            position: fixed;
+            top: 70px;
+            width: 28px;
+            height: 28px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            z-index: 100;
+        }
+
+        .sidebar-toggle:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .sidebar-toggle.left {
+            left: 0;
+            border-radius: 0 4px 4px 0;
+        }
+
+        .sidebar-toggle.right {
+            right: 0;
+            border-radius: 4px 0 0 4px;
+        }
+
+        .results-panel .sidebar-toggle.left {
+            left: 250px;
+        }
+
+        .results-panel .sidebar-toggle.right {
+            right: 350px;
+        }
+
+        .filters-panel.collapsed ~ .results-panel .sidebar-toggle.left {
+            left: 0;
+        }
+
+        .filters-panel.collapsed ~ .results-panel .sidebar-toggle.right {
+            right: 0;
+        }
+
+        .filter-section {
+            margin-bottom: 1.5rem;
+        }
+
+        .filter-section h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 0.75rem;
+            letter-spacing: 0.1em;
+        }
+
+        .filter-group {
+            margin-bottom: 0.75rem;
+        }
+
+        .filter-group label {
+            display: block;
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .filter-group select,
+        .filter-group input[type="text"] {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 0.5rem;
+        }
+
+        .filter-group select:focus,
+        .filter-group input[type="text"]:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .search-input {
+            flex: 1;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            padding: 0.6rem 0.75rem;
+            font-family: inherit;
+            font-size: 13px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .search-input::placeholder {
+            color: var(--muted);
+        }
+
+        .btn {
+            background: var(--fg);
+            color: var(--bg);
+            border: 1px solid var(--fg);
+            padding: 0.6rem 1.25rem;
+            font-family: inherit;
+            font-size: 11px;
+            text-transform: uppercase;
+            cursor: pointer;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
+        }
+
+        .btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-small {
+            padding: 0.4rem 0.75rem;
+            font-size: 10px;
+        }
+
+        .section-header {
+            font-size: 11px;
+            color: var(--muted);
+            text-transform: uppercase;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 1rem;
+            letter-spacing: 0.08em;
+        }
+
+        .result-item {
+            border: 1px solid var(--border);
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            background: var(--bg);
+            cursor: pointer;
+        }
+
+        .result-item:hover {
+            border-color: var(--muted);
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.5rem;
+            gap: 1rem;
+        }
+
+        .case-name {
+            font-weight: 700;
+            font-size: 13px;
+            color: var(--fg);
+        }
+
+        .score-bar {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .score-track {
+            flex: 1;
+            height: 6px;
+            background: var(--border);
+            border-radius: 3px;
+            overflow: hidden;
+            max-width: 120px;
+        }
+
+        .score-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        .score-fill.high { background: var(--accent); }
+        .score-fill.medium { background: #ff0; }
+        .score-fill.low { background: #f00; }
+
+        .score-value {
+            font-size: 12px;
+            font-weight: 700;
+            min-width: 45px;
+        }
+
+        .score-value.high { color: var(--accent); }
+        .score-value.medium { color: #ff0; }
+        .score-value.low { color: #f00; }
+
+        .score-label {
+            font-size: 10px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .metadata {
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 0.75rem;
+        }
+
+        .snippet {
+            background: #0a0a0a;
+            padding: 0.75rem;
+            border-left: 2px solid var(--accent);
+            font-size: 12px;
+            line-height: 1.6;
+        }
+
+        .snippet mark {
+            background: #ff0;
+            color: var(--bg);
+            padding: 1px 3px;
+        }
+
+        .chat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chat-header h3 {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: var(--accent);
+            letter-spacing: 0.1em;
+        }
+
+        .chat-messages {
+            height: calc(100% - 140px);
+            overflow-y: auto;
+            margin-bottom: 1rem;
+        }
+
+        .chat-message {
+            margin-bottom: 1rem;
+            padding: 0.75rem;
+            border-radius: 4px;
+        }
+
+        .chat-message.user {
+            background: var(--border);
+            border-left: 2px solid var(--accent);
+        }
+
+        .chat-message.assistant {
+            background: #0a0a0a;
+            border-left: 2px solid var(--accent);
+        }
+
+        .chat-message .role {
+            font-size: 10px;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin-bottom: 0.25rem;
+        }
+
+        .chat-meta {
+            font-size: 10px;
+            color: var(--muted);
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px solid var(--border);
+            display: flex;
+            gap: 1rem;
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chat-input {
+            flex: 1;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 0.5rem;
+            resize: none;
+            height: 60px;
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .chat-context {
+            background: #0a0a0a;
+            border: 1px solid var(--accent);
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            font-size: 12px;
+        }
+
+        .chat-toggle {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 0.4rem 1rem;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chat-toggle:hover {
+            border-color: var(--accent);
+            color: var(--fg);
+        }
+
+        .case-card {
+            border: 1px solid var(--border);
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+            background: var(--bg);
+        }
+
+        .case-card .case-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 0.75rem;
+        }
+
+        .case-card .case-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--fg);
+        }
+
+        .case-card .case-citation {
+            font-size: 12px;
+            color: var(--accent);
+        }
+
+        .case-card .case-meta {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .case-card .badge {
+            font-size: 10px;
+            padding: 3px 8px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .case-card .badge.court { border-color: var(--accent); color: var(--accent); }
+        .case-card .badge.judge { border-color: #f0f; color: #f0f; }
+        .case-card .badge.year { border-color: #ff0; color: #ff0; }
+        .case-card .badge.type { border-color: #0f0; color: #0f0; }
+
+        .case-card .case-snippets {
+            margin-bottom: 1rem;
+        }
+
+        .case-card .case-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .case-card .btn-view-case,
+        .case-card .btn-ask-case {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            padding: 0.4rem 0.75rem;
+            font-family: inherit;
+            font-size: 11px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .case-card .btn-view-case:hover,
+        .case-card .btn-ask-case:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .case-card .score {
+            font-size: 10px;
+            padding: 2px 6px;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            text-transform: uppercase;
+        }
+
+        .browse-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .case-card {
+            border: 1px solid var(--border);
+            padding: 1rem;
+            background: var(--bg);
+            cursor: pointer;
+        }
+
+        .case-card:hover {
+            border-color: var(--accent);
+        }
+
+        .case-card .case-title {
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 0.5rem;
+        }
+
+        .case-card .case-meta {
+            font-size: 11px;
+            color: var(--muted);
+        }
+
+        .upload-section {
+            border-top: 1px solid var(--border);
+            padding-top: 1rem;
+            margin-top: 1rem;
+        }
+
+        .upload-btn {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--muted);
+            font-family: inherit;
+            font-size: 11px;
+            cursor: pointer;
+            padding: 0.4rem 0.75rem;
+            letter-spacing: 0.05em;
+        }
+
+        .upload-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border);
+            padding: 1.5rem;
+            text-align: center;
+            cursor: pointer;
+            margin-top: 1rem;
+            display: none;
+        }
+
+        .upload-area.show {
+            display: block;
+        }
+
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: var(--accent);
+        }
+
+        .upload-area input[type="file"] {
+            display: none;
+        }
+
+        .upload-icon {
+            font-size: 20px;
+            margin-bottom: 0.5rem;
+            color: var(--muted);
+        }
+
+        .upload-area p {
+            color: var(--muted);
+            font-size: 12px;
+            margin: 0.25rem 0;
+        }
+
+        .upload-area .formats {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .upload-status {
+            padding: 0.75rem 1rem;
+            font-size: 12px;
+            border: 1px solid var(--border);
+            margin-top: 0.75rem;
+            display: none;
+        }
+
+        .upload-status.show {
+            display: block;
+        }
+
+        .upload-status.success {
+            border-color: #0f0;
+            color: #0f0;
+        }
+
+        .upload-status.error {
+            border-color: #f00;
+            color: #f00;
+        }
+
+        .upload-status.loading {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .year-inputs {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .year-inputs input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 0.5rem;
+        }
+
+        .year-inputs input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .year-inputs input::placeholder {
+            color: var(--muted);
+        }
+
+        .loading {
+            color: var(--muted);
+            padding: 1rem 0;
+            font-size: 12px;
+        }
+
+        .loading::before {
+            content: '●';
+            animation: pulse 1s infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+
+        .empty-state {
+            color: var(--muted);
+            padding: 2rem 0;
+            font-size: 12px;
+            text-align: center;
+        }
+
+        .playground-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            height: calc(100vh - 52px);
+            padding: 1rem;
+        }
+
+        .settings-panel, .test-panel {
+            border: 1px solid var(--border);
+            padding: 1rem;
+            background: var(--bg);
+            overflow-y: auto;
+        }
+
+        .settings-section {
+            margin-bottom: 1rem;
+        }
+
+        .settings-section h3 {
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            letter-spacing: 0.1em;
+        }
+
+        .settings-section textarea {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-family: inherit;
+            font-size: 12px;
+            padding: 0.5rem;
+            resize: vertical;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-size: 12px;
+        }
+
+        .setting-row label {
+            flex: 1;
+        }
+
+        .setting-value {
+            min-width: 40px;
+            text-align: right;
+            color: var(--accent);
+        }
+
+        .settings-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .settings-actions button {
+            background: var(--border);
+            border: none;
+            color: var(--fg);
+            padding: 0.5rem 1rem;
+            font-family: inherit;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+
+        .settings-actions button:hover {
+            background: var(--accent);
+            color: var(--bg);
+        }
+
+        .test-input-section input {
+            width: 100%;
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--fg);
+            font-family: inherit;
+            font-size: 14px;
+            padding: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .test-response {
+            margin-top: 1rem;
+        }
+
+        #responsePreview {
+            background: transparent;
+            border: 1px solid var(--border);
+            padding: 1rem;
+            min-height: 200px;
+            font-size: 13px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .test-metrics {
+            margin-top: 1rem;
+        }
+
+        #metricsDisplay {
+            display: flex;
+            gap: 1rem;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        @keyframes blink {
+            0%, 50% { opacity: 1; }
+            51%, 100% { opacity: 0; }
+        }
+
+        .answer-meta {
+            font-size: 10px;
+            color: var(--muted);
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            overflow-y: auto;
+        }
+
+        .modal.visible {
+            display: block;
+        }
+
+        .modal-content {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            max-width: 900px;
+            margin: 2rem auto;
+            padding: 2rem;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            color: var(--fg);
+            font-size: 2rem;
+            cursor: pointer;
+        }
+
+        .modal-header {
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .modal-body {
+            line-height: 1.8;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, var(--border) 25%, #222 50%, var(--border) 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+            border-radius: 4px;
+        }
+
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .skeleton-text {
+            height: 1em;
+            margin-bottom: 0.5rem;
+        }
+
+        .skeleton-title {
+            height: 1.5em;
+            width: 60%;
+            margin-bottom: 1rem;
+        }
+
+        .skeleton-badge {
+            height: 1.5em;
+            width: 80px;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 4px;
+            font-size: 13px;
+            z-index: 2000;
+            animation: slideIn 0.3s ease;
+        }
+
+        .toast.success {
+            background: rgba(0, 255, 0, 0.1);
+            border: 1px solid #0f0;
+            color: #0f0;
+        }
+
+        .toast.error {
+            background: rgba(255, 0, 0, 0.1);
+            border: 1px solid #f00;
+            color: #f00;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        @media (max-width: 900px) {
+            .app-layout {
+                grid-template-columns: 200px 1fr;
+            }
+            .chat-panel {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 600px) {
+            .app-layout {
+                grid-template-columns: 1fr;
+            }
+            .filters-panel {
+                display: none;
+            }
+            nav {
+                flex-direction: column;
+                gap: 0.75rem;
+                align-items: flex-start;
+            }
+            nav .status {
+                width: 100%;
+                justify-content: space-between;
+            }
+            .search-bar {
+                flex-direction: column;
+            }
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="brand">LEGAL<span>RAG</span></div>
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="search">Search</button>
+            <button class="tab-btn" data-tab="browse">Browse Cases</button>
+            <button class="tab-btn" data-tab="playground">Playground</button>
+        </div>
+        <div class="status">
+            <button class="chat-toggle" onclick="toggleChat()">
+                <span id="chatToggleIcon">◈</span>
+            </button>
+            <div class="status-item">
+                <span class="status-dot" id="connectionDot"></span>
+                <span id="connectionStatus">Checking...</span>
+            </div>
+            <div class="status-item" id="docStatus">— docs</div>
+        </div>
+    </nav>
+
+    <div id="search-view" class="app-layout">
+        <button class="sidebar-toggle left" onclick="toggleFilters()" title="Toggle Filters">
+            ◀
+        </button>
+        
+        <aside class="filters-panel" id="filtersPanel">
+            <div class="filter-section" style="margin-bottom: 0.5rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">Filters</h3>
+                    <button onclick="toggleFilters()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;">×</button>
+                </div>
+            </div>
+            <div class="filter-section">
+                <h3>Case Type</h3>
+                <select id="caseTypeFilter" onchange="applyFilters()">
+                    <option value="">All Types</option>
+                </select>
+            </div>
+
+            <div class="filter-section">
+                <h3>Court</h3>
+                <select id="courtFilter" onchange="applyFilters()">
+                    <option value="">All Courts</option>
+                </select>
+            </div>
+
+            <div class="filter-section">
+                <h3>Year Range</h3>
+                <div class="year-inputs">
+                    <input type="number" id="yearFrom" placeholder="From" onchange="applyFilters()">
+                    <input type="number" id="yearTo" placeholder="To" onchange="applyFilters()">
+                </div>
+            </div>
+
+            <div class="filter-section">
+                <h3>Sort By</h3>
+                <select id="sortBy" onchange="applyFilters()">
+                    <option value="relevance">Relevance</option>
+                    <option value="year_desc">Newest First</option>
+                    <option value="year_asc">Oldest First</option>
+                </select>
+            </div>
+
+            <button class="btn" onclick="clearFilters()" style="width: 100%; margin-top: 1rem;">Clear Filters</button>
+
+            <div class="upload-section" style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                <div class="filter-section">
+                    <h3>Add Documents</h3>
+                    <button class="upload-btn" onclick="toggleUpload()" style="width: 100%;">+ Upload Document</button>
+                    <span style="font-size: 10px; color: var(--muted); display: block; margin-top: 0.25rem; text-align: center;">PDF, TXT</span>
+                </div>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">◈</div>
+                    <p><strong>Click to select</strong> or drag and drop</p>
+                    <p class="formats">PDF, TXT</p>
+                    <input type="file" id="fileInput" accept=".pdf,.txt" onchange="uploadFile(this.files[0])" />
+                </div>
+                
+                <div id="uploadStatus" class="upload-status"></div>
+            </div>
+        </aside>
+
+        <main class="results-panel">
+            <div class="search-bar">
+                <input 
+                    type="text" 
+                    class="search-input" 
+                    id="searchInput"
+                    placeholder="Search cases..."
+                    onkeydown="if(event.key === 'Enter') performSearch()"
+                />
+                <button class="btn" id="searchBtn" onclick="performSearch()">Search</button>
+                <button class="btn" id="chatToggleBtn" onclick="toggleChat()" style="background: var(--bg); color: var(--fg);">Chat</button>
+            </div>
+
+            <div id="resultsSection">
+                <div class="section-header">Results</div>
+                <div id="resultsContainer">
+                    <div class="empty-state">
+                        <p>Enter a search query to find relevant cases</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <aside class="chat-panel" id="chatPanel">
+            <div class="chat-header">
+                <h3>Chat</h3>
+                <button class="btn btn-small" onclick="toggleChat()">×</button>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="empty-state">
+                    <p>Ask follow-up questions about your search results</p>
+                </div>
+            </div>
+            <div class="chat-input-wrapper">
+                <textarea class="chat-input" id="chatInput" placeholder="Ask a follow-up..." onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendChatMessage(); }"></textarea>
+                <button class="btn btn-small" onclick="sendChatMessage()">Send</button>
+            </div>
+        </aside>
+    </div>
+
+    <div id="browse-view" style="display: none; padding: 1rem;">
+        <div class="browse-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div class="section-header" style="margin-bottom: 0; border-bottom: none; padding: 0;">Case Library</div>
+            <div class="browse-filters" style="display: flex; gap: 0.5rem;">
+                <select id="browseCourtFilter" style="background: transparent; border: 1px solid var(--border); color: var(--fg); font-family: inherit; font-size: 11px; padding: 0.4rem;">
+                    <option value="">All Courts</option>
+                </select>
+                <select id="browseCaseTypeFilter" style="background: transparent; border: 1px solid var(--border); color: var(--fg); font-family: inherit; font-size: 11px; padding: 0.4rem;">
+                    <option value="">All Types</option>
+                </select>
+                <button class="btn btn-small" onclick="loadCases(0)">Apply</button>
+            </div>
+        </div>
+        <div class="browse-grid" id="browseGrid">
+            <div class="loading">Loading cases...</div>
+        </div>
+        <div class="pagination" id="casesPagination" style="display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border);">
+            <button class="btn btn-small" onclick="loadCases(currentPage - 1)" id="prevPageBtn">Previous</button>
+            <span id="pageInfo" style="font-size: 12px; color: var(--muted);">Page 1 of 1</span>
+            <button class="btn btn-small" onclick="loadCases(currentPage + 1)" id="nextPageBtn">Next</button>
+        </div>
+    </div>
+
+    <div id="playground-view" style="display: none;">
+        <div class="playground-layout">
+            <div class="settings-panel">
+                <div class="settings-section">
+                    <h3>System Prompt</h3>
+                    <textarea id="systemPrompt" rows="6"></textarea>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Intent Detection Prompt</h3>
+                    <textarea id="intentPrompt" rows="4"></textarea>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Guardrail Prompt</h3>
+                    <textarea id="guardrailPrompt" rows="4"></textarea>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Generation Settings</h3>
+                    <div class="setting-row">
+                        <label>Temperature</label>
+                        <input type="range" id="temperature" min="0" max="2" step="0.1" value="0.3">
+                        <span class="setting-value" id="temperatureValue">0.3</span>
+                    </div>
+                    <div class="setting-row">
+                        <label>Max Tokens</label>
+                        <input type="number" id="maxTokens" value="500" min="1" max="4000">
+                    </div>
+                    <div class="setting-row">
+                        <label>Top K</label>
+                        <input type="number" id="topK" value="5" min="1" max="20">
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Safety Features</h3>
+                    <div class="setting-row">
+                        <label>
+                            <input type="checkbox" id="enableIntent" checked>
+                            Enable Intent Detection
+                        </label>
+                    </div>
+                    <div class="setting-row">
+                        <label>
+                            <input type="checkbox" id="enableGuardrails" checked>
+                            Enable Guardrails
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="settings-actions">
+                    <button id="saveSettings">Save</button>
+                    <button id="loadSettings">Load</button>
+                    <button id="exportSettings">Export</button>
+                    <button id="resetSettings">Reset</button>
+                </div>
+            </div>
+            
+            <div class="test-panel">
+                <div class="test-input-section">
+                    <h3>Test Query</h3>
+                    <input type="text" id="testQuery" placeholder="Enter legal question...">
+                    <button id="sendTest">Send Test</button>
+                </div>
+                
+                <div class="test-response">
+                    <h3>Response Preview</h3>
+                    <div id="responsePreview"></div>
+                </div>
+                
+                <div class="test-metrics">
+                    <h3>Metrics</h3>
+                    <div id="metricsDisplay">
+                        <span>Latency: --</span>
+                        <span>Confidence: --</span>
+                        <span>Sources: --</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="caseModal" class="modal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeCaseModal()">&times;</button>
+            <div class="modal-header">
+                <h2 id="modalCaseName"></h2>
+                <p id="modalCitation" class="citation"></p>
+                <div class="modal-meta">
+                    <span class="badge court" id="modalCourt"></span>
+                    <span class="badge judge" id="modalJudge"></span>
+                    <span class="badge year" id="modalYear"></span>
+                </div>
+            </div>
+            <div class="modal-body" id="modalBody">
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.origin;
+
+        function showToast(message, type = 'success') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 5000);
+        }
+
+        function showError(message) {
+            showToast(message, 'error');
+        }
+
+        function showSuccess(message) {
+            showToast(message, 'success');
+        }
+
+        function showLoadingSkeleton() {
+            return `
+                <div class="case-card skeleton">
+                    <div class="skeleton-title"></div>
+                    <div class="skeleton-text" style="width: 40%;"></div>
+                    <div>
+                        <div class="skeleton-badge"></div>
+                        <div class="skeleton-badge"></div>
+                        <div class="skeleton-badge"></div>
+                    </div>
+                </div>
+            `.repeat(3);
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const tab = btn.dataset.tab;
+                document.getElementById('search-view').style.display = tab === 'search' ? 'grid' : 'none';
+                document.getElementById('browse-view').style.display = tab === 'browse' ? 'block' : 'none';
+                document.getElementById('playground-view').style.display = tab === 'playground' ? 'block' : 'none';
+                localStorage.setItem('activeTab', tab);
+                if (tab === 'browse') {
+                    loadCases(0);
+                }
+            });
+        });
+
+        const savedTab = localStorage.getItem('activeTab');
+        if (savedTab && ['search', 'browse', 'playground'].includes(savedTab)) {
+            document.querySelector(`[data-tab="${savedTab}"]`)?.click();
+        } else {
+            document.querySelector('[data-tab="search"]')?.click();
+        }
+
+        window.addEventListener('load', () => {
+            checkHealth();
+            loadFilterOptions();
+        });
+
+        let currentFilters = {
+            court: '',
+            case_type: '',
+            year_from: null,
+            year_to: null,
+            sort_by: 'relevance'
+        };
+
+        async function loadFilterOptions() {
+            try {
+                const res = await fetch(`${API_URL}/api/filters`);
+                const data = await res.json();
+                
+                const courtSelect = document.getElementById('courtFilter');
+                const browseCourtSelect = document.getElementById('browseCourtFilter');
+                if (data.courts) {
+                    data.courts.forEach(court => {
+                        const opt = document.createElement('option');
+                        opt.value = court;
+                        opt.textContent = court;
+                        courtSelect.appendChild(opt);
+                        
+                        const browseOpt = document.createElement('option');
+                        browseOpt.value = court;
+                        browseOpt.textContent = court;
+                        browseCourtSelect.appendChild(browseOpt);
+                    });
+                }
+                
+                const typeSelect = document.getElementById('caseTypeFilter');
+                const browseTypeSelect = document.getElementById('browseCaseTypeFilter');
+                if (data.case_types) {
+                    data.case_types.forEach(type => {
+                        const opt = document.createElement('option');
+                        opt.value = type;
+                        opt.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                        typeSelect.appendChild(opt);
+                        
+                        const browseOpt = document.createElement('option');
+                        browseOpt.value = type;
+                        browseOpt.textContent = type.charAt(0).toUpperCase() + type.slice(1);
+                        browseTypeSelect.appendChild(browseOpt);
+                    });
+                }
+                
+                if (data.year_range) {
+                    document.getElementById('yearFrom').placeholder = `Min: ${data.year_range.min}`;
+                    document.getElementById('yearTo').placeholder = `Max: ${data.year_range.max}`;
+                }
+            } catch (e) {
+                console.error('Failed to load filters:', e);
+            }
+        }
+
+        function applyFilters() {
+            currentFilters = {
+                court: document.getElementById('courtFilter').value,
+                case_type: document.getElementById('caseTypeFilter').value,
+                year_from: document.getElementById('yearFrom').value || null,
+                year_to: document.getElementById('yearTo').value || null,
+                sort_by: document.getElementById('sortBy').value
+            };
+            performSearch();
+        }
+
+        function clearFilters() {
+            document.getElementById('courtFilter').value = '';
+            document.getElementById('caseTypeFilter').value = '';
+            document.getElementById('yearFrom').value = '';
+            document.getElementById('yearTo').value = '';
+            document.getElementById('sortBy').value = 'relevance';
+            applyFilters();
+        }
+
+        async function checkHealth() {
+            try {
+                const res = await fetch(`${API_URL}/api/health`);
+                const data = await res.json();
+                
+                if (data.status === 'ok') {
+                    document.getElementById('connectionDot').classList.add('connected');
+                    document.getElementById('connectionStatus').textContent = 'Connected';
+                    document.getElementById('docStatus').textContent = '— docs';
+                } else {
+                    setErrorStatus();
+                }
+            } catch (e) {
+                setErrorStatus();
+            }
+        }
+
+        function setErrorStatus() {
+            document.getElementById('connectionDot').classList.add('error');
+            document.getElementById('connectionStatus').textContent = 'Error';
+        }
+
+        function toggleChat() {
+            const chatPanel = document.getElementById('chatPanel');
+            chatPanel.classList.toggle('visible');
+            
+            const rightToggle = document.querySelector('.sidebar-toggle.right');
+            if (rightToggle) {
+                rightToggle.textContent = chatPanel.classList.contains('visible') ? '▶' : '◀';
+            }
+            
+            const headerBtn = document.querySelector('.chat-toggle span');
+            if (headerBtn) {
+                headerBtn.textContent = chatPanel.classList.contains('visible') ? '◀' : '◈';
+            }
+        }
+
+        function toggleFilters() {
+            const filtersPanel = document.getElementById('filtersPanel');
+            filtersPanel.classList.toggle('collapsed');
+            
+            const leftToggle = document.querySelector('.sidebar-toggle.left');
+            if (leftToggle) {
+                leftToggle.textContent = filtersPanel.classList.contains('collapsed') ? '▶' : '◀';
+            }
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            const searchBtn = document.getElementById('searchBtn');
+            const resultsContainer = document.getElementById('resultsContainer');
+
+            if (!query) return;
+
+            searchBtn.disabled = true;
+            const topK = 10;
+            resultsContainer.innerHTML = showLoadingSkeleton();
+
+            try {
+                const filters = {};
+                if (currentFilters.court) filters.court = currentFilters.court;
+                if (currentFilters.case_type) filters.case_type = currentFilters.case_type;
+                if (currentFilters.year_from) filters.year = currentFilters.year_from;
+                const filtersToSend = Object.keys(filters).length > 0 ? filters : null;
+
+                const searchRes = await fetch(`${API_URL}/api/search`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        query, 
+                        top_k: topK,
+                        filters: filtersToSend
+                    })
+                });
+
+                if (searchRes.ok) {
+                    const searchData = await searchRes.json();
+                    displayResults(searchData, resultsContainer);
+                }
+
+                showAIAnswerInChat(query);
+
+            } catch (error) {
+                resultsContainer.innerHTML = `<div class="error-msg">Error: ${escapeHtml(error.message)}</div>`;
+                showError(`Search error: ${error.message}`);
+            } finally {
+                searchBtn.disabled = false;
+            }
+        }
+
+        async function showAIAnswerInChat(query) {
+            const chatPanel = document.getElementById('chatPanel');
+            const chatMessages = document.getElementById('chatMessages');
+            
+            chatPanel.classList.add('visible');
+            const rightToggle = document.querySelector('.sidebar-toggle.right');
+            if (rightToggle) rightToggle.textContent = '▶';
+            
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'chat-message user';
+            questionDiv.innerHTML = `<div class="role">You</div>${escapeHtml(query)}`;
+            chatMessages.appendChild(questionDiv);
+            
+            const responseDiv = document.createElement('div');
+            responseDiv.className = 'chat-message assistant';
+            responseDiv.innerHTML = '<div class="role">AI</div><div class="loading">Thinking...</div>';
+            chatMessages.appendChild(responseDiv);
+            
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const chatRes = await fetch(`${API_URL}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        question: query,
+                        history: []
+                    })
+                });
+
+                if (!chatRes.ok) throw new Error(`HTTP ${chatRes.status}`);
+
+                const reader = chatRes.body.getReader();
+                const decoder = new TextDecoder();
+                let fullAnswer = '';
+                let sources = [];
+                let confidence = null;
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value);
+                    const lines = text.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.type === 'token' && data.content) {
+                                    fullAnswer += data.content;
+                                    responseDiv.querySelector('.loading').innerHTML = escapeHtml(fullAnswer).replace(/\n/g, '<br>');
+                                } else if (data.type === 'done') {
+                                    confidence = data.confidence;
+                                    sources = data.sources || [];
+                                    
+                                    let metaHtml = '<div class="chat-meta">';
+                                    if (sources.length > 0) {
+                                        metaHtml += `<span>${sources.length} source${sources.length > 1 ? 's' : ''}</span>`;
+                                    }
+                                    if (confidence) {
+                                        metaHtml += `<span>${(confidence * 100).toFixed(0)}% confidence</span>`;
+                                    }
+                                    metaHtml += '</div>';
+                                    responseDiv.innerHTML += metaHtml;
+                                } else if (data.type === 'error') {
+                                    throw new Error(data.message);
+                                }
+                            } catch (e) {
+                                console.error('SSE parse error:', e);
+                            }
+                        }
+                    }
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }
+
+            } catch (error) {
+                responseDiv.querySelector('.loading').innerHTML = `<span style="color: #f00">Error: ${escapeHtml(error.message)}</span>`;
+            }
+        }
+
+        function displayResults(data, container) {
+            if (!data.results || data.results.length === 0) {
+                container.innerHTML = '<div class="empty-state">No documents found</div>';
+                return;
+            }
+
+            let html = `<p style="font-size: 11px; color: var(--muted); margin-bottom: 1rem;">${data.total_results} documents retrieved in ${data.retrieval_time_ms}ms</p>`;
+
+            data.results.forEach(result => {
+                const meta = result.metadata || {};
+                const caseName = meta.case_name || meta.source || 'Unknown Case';
+                const citation = meta.citation || '';
+                const court = meta.court || '';
+                const judge = meta.judge || '';
+                const year = meta.year || '';
+                const caseType = meta.case_type || '';
+                const docId = meta.source || '';
+
+                html += `<div class="case-card">`;
+
+                html += `
+                    <div class="case-header">
+                        <h3 class="case-title">${escapeHtml(caseName)}</h3>
+                        <span class="case-citation">${escapeHtml(citation)}</span>
+                    </div>
+                `;
+
+                const rawScore = result.score || 0;
+                const scorePercent = Math.max(0, Math.min(100, Math.round(rawScore * 100)));
+                const scoreLevel = scorePercent >= 70 ? 'high' : scorePercent >= 40 ? 'medium' : 'low';
+                
+                html += `
+                    <div class="score-bar">
+                        <span class="score-label">Relevance</span>
+                        <div class="score-track">
+                            <div class="score-fill ${scoreLevel}" style="width: ${scorePercent}%"></div>
+                        </div>
+                        <span class="score-value ${scoreLevel}">${scorePercent}%</span>
+                    </div>
+                `;
+
+                html += `<div class="case-meta">`;
+                if (court) html += `<span class="badge court">${escapeHtml(court)}</span>`;
+                if (judge) html += `<span class="badge judge">${escapeHtml(judge)}</span>`;
+                if (year) html += `<span class="badge year">${escapeHtml(year)}</span>`;
+                if (caseType) html += `<span class="badge type">${escapeHtml(caseType)}</span>`;
+                html += `</div>`;
+
+                html += `<div class="case-snippets">`;
+                if (result.snippets && result.snippets.length > 0) {
+                    result.snippets.forEach(snippet => {
+                        html += `<div class="snippet">${snippet.highlighted}</div>`;
+                    });
+                } else {
+                    html += `<div class="snippet">${escapeHtml(result.text.substring(0, 300))}...</div>`;
+                }
+                html += `</div>`;
+
+                html += `
+                    <div class="case-actions">
+                        <button class="btn-view-case" onclick="viewCaseDetail('${docId}')">View Full Case</button>
+                        <button class="btn-ask-case" onclick="askAboutCase('${docId}')">Ask AI</button>
+                    </div>
+                `;
+
+                html += `</div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        let currentCaseContext = null;
+
+        function askAboutCase(caseId) {
+            const chatPanel = document.getElementById('chatPanel');
+            chatPanel.classList.add('visible');
+            
+            fetch(`${API_URL}/api/cases/${encodeURIComponent(caseId)}`)
+                .then(res => res.json())
+                .then(data => {
+                    currentCaseContext = data;
+                    
+                    const chatMessages = document.getElementById('chatMessages');
+                    if (chatMessages) {
+                        const existingContext = chatMessages.querySelector('.chat-context');
+                        if (existingContext) existingContext.remove();
+                        
+                        const contextMsg = document.createElement('div');
+                        contextMsg.className = 'chat-context';
+                        contextMsg.innerHTML = `
+                            <strong>Context:</strong> ${escapeHtml(data.case_name || data.source || 'Unknown')}
+                            ${data.citation ? ` (${escapeHtml(data.citation)})` : ''}
+                        `;
+                        chatMessages.insertBefore(contextMsg, chatMessages.firstChild);
+                    }
+                })
+                .catch(err => console.error('Failed to load case context:', err));
+        }
+
+        let chatHistory = [];
+
+        async function sendChatMessage() {
+            const chatInput = document.getElementById('chatInput');
+            const chatMessages = document.getElementById('chatMessages');
+            const message = chatInput.value.trim();
+            
+            if (!message) return;
+
+            chatHistory.push({ role: 'user', content: message });
+            chatInput.value = '';
+
+            const userMsg = document.createElement('div');
+            userMsg.className = 'chat-message user';
+            userMsg.innerHTML = `<div class="role">You</div><div>${escapeHtml(message)}</div>`;
+            chatMessages.appendChild(userMsg);
+
+            const loadingMsg = document.createElement('div');
+            loadingMsg.className = 'chat-message assistant';
+            loadingMsg.innerHTML = '<div class="role">Assistant</div><div class="loading">Thinking...</div>';
+            chatMessages.appendChild(loadingMsg);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+
+            try {
+                const response = await fetch(`${API_URL}/api/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        question: message,
+                        history: chatHistory.slice(0, -1)
+                    })
+                });
+
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let fullAnswer = '';
+
+                loadingMsg.innerHTML = '<div class="role">Assistant</div>';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const text = decoder.decode(value);
+                    const lines = text.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.type === 'token' && data.content) {
+                                    fullAnswer += data.content;
+                                    loadingMsg.innerHTML = '<div class="role">Assistant</div><div>' + escapeHtml(fullAnswer).replace(/\n/g, '<br>') + '</div>';
+                                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+
+                chatHistory.push({ role: 'assistant', content: fullAnswer });
+
+            } catch (error) {
+                loadingMsg.innerHTML = '<div class="role">Assistant</div><div style="color: #f00;">Error: ' + escapeHtml(error.message) + '</div>';
+            }
+        }
+
+        function toggleUpload() {
+            const area = document.getElementById('uploadArea');
+            area.classList.toggle('show');
+        }
+
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file) uploadFile(file);
+        });
+
+        async function uploadFile(file) {
+            if (!file) return;
+
+            const statusDiv = document.getElementById('uploadStatus');
+            const allowed = ['.pdf', '.txt'];
+            const ext = '.' + file.name.split('.').pop().toLowerCase();
+
+            if (!allowed.includes(ext)) {
+                statusDiv.className = 'upload-status show error';
+                statusDiv.textContent = `Unsupported: ${ext}. Use PDF or TXT.`;
+                return;
+            }
+
+            statusDiv.className = 'upload-status show loading';
+            statusDiv.textContent = `Uploading "${file.name}"...`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const response = await fetch(`${API_URL}/api/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.detail || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+                statusDiv.className = 'upload-status show success';
+                statusDiv.textContent = `✓ ${data.filename} — ${data.chunks_indexed} chunks indexed`;
+                showSuccess(`${data.filename} uploaded successfully (${data.chunks_indexed} chunks)`);
+
+                document.getElementById('fileInput').value = '';
+                checkHealth();
+
+                setTimeout(() => {
+                    document.getElementById('uploadArea').classList.remove('show');
+                }, 2000);
+
+            } catch (error) {
+                statusDiv.className = 'upload-status show error';
+                statusDiv.textContent = `✗ ${error.message}`;
+                showError(`Upload failed: ${error.message}`);
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        const DEFAULT_PROMPTS = {
+            system_prompt: `You are a legal research assistant helping lawyers and legal professionals find relevant case law and legal information.
+
+**Your role:**
+- Answer questions based ONLY on the provided legal documents
+- Cite specific cases, sections, and page numbers when referencing information
+- Quote relevant passages verbatim when appropriate
+- Clearly distinguish between holdings, dicta, and procedural history
+- Flag jurisdictional differences when relevant
+- If information is not in the provided context, say so explicitly
+
+**Response format:**
+- Start with a direct answer to the question
+- Support with specific case citations and quotes
+- Reference page numbers when available
+- Note any limitations or caveats
+
+**Do not:**
+- Provide legal advice
+- Make assumptions beyond the provided documents
+- Cite cases not in the retrieval context
+- Summarize without attribution`,
+            
+            intent_prompt: `You are a legal casebase intent classifier. Determine if the user's question is related to legal research, case law, legal documents, or legal information in the loaded casebase.
+
+Legal-related topics include:
+- Questions about court cases, judgments, rulings
+- Questions about legal principles, doctrines, statutes
+- Questions about contracts, agreements, legal terms
+- Questions about legal procedures, litigation, trials
+
+NOT legal-related:
+- General conversation or greetings
+- Questions about non-legal topics (weather, sports, etc.)
+
+Respond ONLY with valid JSON: {"should_proceed": true/false, "reason": "brief reason", "confidence": 0.0-1.0}`,
+            
+            guardrail_prompt: `You are a legal query guardrail. Analyze the user's question for potential issues.
+
+Check for:
+1. Potential PII in the query
+2. Harmful or inappropriate content
+3. Queries trying to extract specific personal information
+
+Return JSON: {"is_safe": true/false, "reason": "brief reason", "requires_disclaimer": true/false}`,
+            
+            temperature: 0.3,
+            max_tokens: 500,
+            top_k: 5,
+            enable_intent_detection: true,
+            enable_guardrails: true
+        };
+
+        function loadSettingsFromUI() {
+            return {
+                system_prompt: document.getElementById('systemPrompt').value,
+                intent_prompt: document.getElementById('intentPrompt').value,
+                guardrail_prompt: document.getElementById('guardrailPrompt').value,
+                temperature: parseFloat(document.getElementById('temperature').value),
+                max_tokens: parseInt(document.getElementById('maxTokens').value),
+                top_k: parseInt(document.getElementById('topK').value),
+                enable_intent_detection: document.getElementById('enableIntent').checked,
+                enable_guardrails: document.getElementById('enableGuardrails').checked
+            };
+        }
+
+        function applySettingsToUI(settings) {
+            document.getElementById('systemPrompt').value = settings.system_prompt || '';
+            document.getElementById('intentPrompt').value = settings.intent_prompt || '';
+            document.getElementById('guardrailPrompt').value = settings.guardrail_prompt || '';
+            document.getElementById('temperature').value = settings.temperature || 0.3;
+            document.getElementById('temperatureValue').textContent = settings.temperature || 0.3;
+            document.getElementById('maxTokens').value = settings.max_tokens || 500;
+            document.getElementById('topK').value = settings.top_k || 5;
+            document.getElementById('enableIntent').checked = settings.enable_intent_detection !== false;
+            document.getElementById('enableGuardrails').checked = settings.enable_guardrails !== false;
+        }
+
+        function saveSettings() {
+            const settings = loadSettingsFromUI();
+            localStorage.setItem('ragPlaygroundSettings', JSON.stringify(settings));
+            showStatus('Settings saved');
+        }
+
+        function resetSettings() {
+            applySettingsToUI(DEFAULT_PROMPTS);
+            localStorage.setItem('ragPlaygroundSettings', JSON.stringify(DEFAULT_PROMPTS));
+            showStatus('Settings reset to defaults');
+        }
+
+        function exportSettings() {
+            const settings = loadSettingsFromUI();
+            const blob = new Blob([JSON.stringify(settings, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'rag-settings.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importSettings(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const settings = JSON.parse(e.target.result);
+                    applySettingsToUI(settings);
+                    showStatus('Settings imported');
+                } catch (err) {
+                    showStatus('Invalid JSON file', true);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function showStatus(message, isError = false) {
+            const status = document.createElement('div');
+            status.className = 'upload-status show ' + (isError ? 'error' : 'success');
+            status.textContent = message;
+            document.querySelector('.settings-panel').appendChild(status);
+            setTimeout(() => status.remove(), 3000);
+        }
+
+        async function sendTestQuery() {
+            const query = document.getElementById('testQuery').value.trim();
+            if (!query) return;
+            
+            const settings = loadSettingsFromUI();
+            const responsePreview = document.getElementById('responsePreview');
+            const metricsDisplay = document.getElementById('metricsDisplay');
+            
+            responsePreview.textContent = 'Loading...';
+            const startTime = Date.now();
+            
+            try {
+                const response = await fetch(`${API_URL}/api/chat`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        question: query,
+                        settings: settings
+                    })
+                });
+                
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let answer = '';
+                
+                while (true) {
+                    const {done, value} = await reader.read();
+                    if (done) break;
+                    
+                    const chunk = decoder.decode(value);
+                    const lines = chunk.split('\n');
+                    
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                if (data.type === 'token') {
+                                    answer += data.content;
+                                    responsePreview.textContent = answer;
+                                } else if (data.type === 'done') {
+                                    const elapsed = Date.now() - startTime;
+                                    metricsDisplay.innerHTML = `
+                                        <span>Latency: ${elapsed}ms</span>
+                                        <span>Confidence: ${(data.confidence || 0).toFixed(2)}</span>
+                                        <span>Sources: ${data.sources?.length || 0}</span>
+                                    `;
+                                }
+                            } catch (e) {}
+                        }
+                    }
+                }
+            } catch (err) {
+                responsePreview.textContent = `Error: ${err.message}`;
+            }
+        }
+
+        document.getElementById('saveSettings').addEventListener('click', saveSettings);
+        document.getElementById('resetSettings').addEventListener('click', resetSettings);
+        document.getElementById('exportSettings').addEventListener('click', exportSettings);
+        document.getElementById('loadSettings').addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = (e) => importSettings(e.target.files[0]);
+            input.click();
+        });
+
+        document.getElementById('temperature').addEventListener('input', (e) => {
+            document.getElementById('temperatureValue').textContent = e.target.value;
+        });
+
+        document.getElementById('sendTest').addEventListener('click', sendTestQuery);
+        document.getElementById('testQuery').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendTestQuery();
+        });
+
+        try {
+            const savedSettings = localStorage.getItem('ragPlaygroundSettings');
+            if (savedSettings) {
+                applySettingsToUI(JSON.parse(savedSettings));
+            } else {
+                applySettingsToUI(DEFAULT_PROMPTS);
+            }
+        } catch (e) {
+            console.warn('Failed to load saved settings:', e);
+            applySettingsToUI(DEFAULT_PROMPTS);
+        }
+
+        document.querySelector('[data-tab="browse"]').addEventListener('click', () => loadCases(0));
+
+        let currentPage = 0;
+        const pageSize = 10;
+
+        async function loadCases(page = 0) {
+            if (page < 0) return;
+            currentPage = page;
+            const offset = page * pageSize;
+            
+            const params = new URLSearchParams({
+                limit: pageSize,
+                offset: offset
+            });
+            
+            const court = document.getElementById('browseCourtFilter')?.value;
+            const caseType = document.getElementById('browseCaseTypeFilter')?.value;
+            
+            if (court) params.append('court', court);
+            if (caseType) params.append('case_type', caseType);
+            
+            const grid = document.getElementById('browseGrid');
+            grid.innerHTML = '<div class="loading">Loading cases...</div>';
+            
+            try {
+                const res = await fetch(`${API_URL}/api/cases?${params}`);
+                const data = await res.json();
+                
+                displayCasesGrid(data.cases, data.total);
+                updatePagination(data.total);
+            } catch (err) {
+                console.error('Failed to load cases:', err);
+                grid.innerHTML = '<div class="error-msg">Failed to load cases</div>';
+            }
+        }
+
+        function displayCasesGrid(cases, total) {
+            const grid = document.getElementById('browseGrid');
+            
+            if (!cases || cases.length === 0) {
+                grid.innerHTML = '<div class="empty-state">No cases found</div>';
+                return;
+            }
+            
+            let html = '';
+            cases.forEach(c => {
+                html += `
+                    <div class="case-card" onclick="viewCaseDetail('${escapeHtml(c.source || c.case_name || '')}')">
+                        <h3 class="case-title">${escapeHtml(c.case_name || c.source || 'Unknown Case')}</h3>
+                        <p class="case-citation">${escapeHtml(c.citation || '')}</p>
+                        <div class="case-meta">
+                            ${c.court ? `<span class="badge court">${escapeHtml(c.court)}</span>` : ''}
+                            ${c.judge ? `<span class="badge judge">${escapeHtml(c.judge)}</span>` : ''}
+                            ${c.year ? `<span class="badge year">${c.year}</span>` : ''}
+                            ${c.case_type ? `<span class="badge type">${escapeHtml(c.case_type)}</span>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            grid.innerHTML = html;
+        }
+
+        function updatePagination(total) {
+            const totalPages = Math.ceil(total / pageSize);
+            document.getElementById('pageInfo').textContent = `Page ${currentPage + 1} of ${totalPages}`;
+            document.getElementById('prevPageBtn').disabled = currentPage === 0;
+            document.getElementById('nextPageBtn').disabled = currentPage >= totalPages - 1;
+        }
+
+        function viewCaseDetail(caseId) {
+            document.getElementById('caseModal').classList.add('visible');
+            document.getElementById('modalBody').innerHTML = '<div class="loading">Loading case...</div>';
+            
+            fetch(`${API_URL}/api/cases/${encodeURIComponent(caseId)}`)
+                .then(res => res.json())
+                .then(data => {
+                    document.getElementById('modalCaseName').textContent = data.case_name || 'Unknown Case';
+                    document.getElementById('modalCitation').textContent = data.citation || '';
+                    document.getElementById('modalCourt').textContent = data.court || '';
+                    document.getElementById('modalJudge').textContent = data.judge || '';
+                    document.getElementById('modalYear').textContent = data.year || '';
+                    document.getElementById('modalBody').textContent = data.full_text || 'No content';
+                })
+                .catch(err => {
+                    document.getElementById('modalBody').innerHTML = `<div class="error-msg">Error loading case: ${err.message}</div>`;
+                });
+        }
+
+        function closeCaseModal() {
+            document.getElementById('caseModal').classList.remove('visible');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            const tag = e.target.tagName.toLowerCase();
+            const isInput = tag === 'input' || tag === 'textarea' || tag === 'select';
+            
+            if (e.key === 'Escape') {
+                closeCaseModal();
+                return;
+            }
+            
+            if (isInput) return;
+            
+            switch (e.key) {
+                case '/':
+                    e.preventDefault();
+                    document.getElementById('searchInput')?.focus();
+                    break;
+                case 'b':
+                    e.preventDefault();
+                    switchTab('browse');
+                    break;
+                case 's':
+                    e.preventDefault();
+                    switchTab('search');
+                    break;
+                case 'c':
+                    e.preventDefault();
+                    toggleChat();
+                    break;
+                case '?':
+                    e.preventDefault();
+                    showKeyboardShortcuts();
+                    break;
+            }
+        });
+
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.tab === tabName) {
+                    btn.classList.add('active');
+                }
+            });
+            
+            document.getElementById('search-view').style.display = tabName === 'search' ? 'grid' : 'none';
+            document.getElementById('browse-view').style.display = tabName === 'browse' ? 'block' : 'none';
+            document.getElementById('playground-view').style.display = tabName === 'playground' ? 'block' : 'none';
+            localStorage.setItem('activeTab', tabName);
+            
+            if (tabName === 'browse') {
+                loadCases(0);
+            }
+        }
+
+        function showKeyboardShortcuts() {
+            const shortcuts = `
+Keyboard Shortcuts:
+/ - Focus search
+s - Search tab
+b - Browse tab
+c - Toggle chat
+? - This help
+Esc - Close modal
+            `.trim();
+            alert(shortcuts);
+        }
+    </script>
+</body>
+</html>

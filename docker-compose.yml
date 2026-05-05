@@ -1,0 +1,9 @@
+# Coolify-managed Docker Compose — proxy handled by Coolify Traefik
+services:
+  app:
+    build: .
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - .:/app
+    restart: unless-stopped

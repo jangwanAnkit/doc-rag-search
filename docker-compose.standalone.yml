@@ -1,0 +1,8 @@
+# Standalone version — run without Coolify
+# Original run: docker run -d --name doc-rag -p 8000:8000 doc-rag-search
+services:
+  app:
+    build: .
+    container_name: doc-rag
+    ports:
+      - "8000:8000"
